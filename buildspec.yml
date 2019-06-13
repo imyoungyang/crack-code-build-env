@@ -1,0 +1,66 @@
+version: 0.2
+
+env:
+  parameter-store:
+    POC_KEYS: "/aws/reference/secretsmanager/specialist/poc/cicd"
+
+phases:
+  install:
+    runtime-versions:
+      docker: 18
+  pre_build:
+    commands:
+      # This was started. Just replace REPLACEME_REPO_URI with your ECR Repo URI
+      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/mxnet-poc
+      
+      - echo get parameter store
+      - echo $POC_KEYS
+      - echo container credentials relative uri
+      - echo $AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
+
+      - echo login to access to the Amazon Deep Learning Container image repository
+      - $(aws ecr get-login --no-include-email --region us-east-1 --registry-ids 763104351884)
+
+      - echo Logging in to Amazon ECR...
+      - $(aws ecr get-login --no-include-email --region $AWS_DEFAULT_REGION)
+      
+      # https://docs.aws.amazon.com/cli/latest/userguide/install-bundle.html
+      - echo install awscli to container via bundle way... because s3 privateLink
+      - curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
+      - unzip awscli-bundle.zip
+      
+      # helper script for creditial. This is for demo purpose
+      - . ./helper.sh
+      - echo $AccessKeyId
+      - echo $SecretAccessKey
+      - echo $Token
+
+  build:
+    commands:
+      - ls
+      - cat Dockerfile
+      - echo $REPOSITORY_URI
+      - echo $CODEBUILD_RESOLVED_SOURCE_VERSION
+
+      - echo Build started on `date`
+      - echo Building the Docker image...
+      - docker build --build-arg AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION --build-arg AWS_CONTAINER_CREDENTIALS_RELATIVE_URI=$AWS_CONTAINER_CREDENTIALS_RELATIVE_URI -t $REPOSITORY_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION .
+
+      # checkout code at docker in docker for security safe
+      # - git config --global credential.helper '!aws codecommit credential-helper $@'
+      # - git config --global credential.UseHttpPath true
+      # - git clone "https://git-codecommit.us-east-1.amazonaws.com/v1/repos/mxnet-1.4.0"
+      # - docker build --build-arg AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION --build-arg AWS_ACCESS_KEY_ID=$AccessKeyId --build-arg AWS_SECRET_ACCESS_KEY=$SecretAccessKey --build-arg AWS_SESSION_TOKEN=$Token -t $REPOSITORY_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION .
+      # - docker tag $REPOSITORY_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION $REPOSITORY_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Pushing the Docker image...
+      - docker push $REPOSITORY_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION
+
+      # this is another way to run aws command for docker in docker
+      # - docker run -e AWS_DEFAULT_REGION -e AWS_CONTAINER_CREDENTIALS_RELATIVE_URI $REPOSITORY_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION aws s3 ls
+      
+      # Training will failed for train_mnist.py 
+      # because it will access http://yann.lecun.com/exdb/mnist/ to download data set.
+      # - docker run $REPOSITORY_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION
