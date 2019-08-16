@@ -1,5 +1,9 @@
 version: 0.2
 
+env:
+  parameter-store:
+    POC_KEYS: "/aws/reference/secretsmanager/specialist/poc/cicd"
+
 phases:
   install:
     runtime-versions:
@@ -8,7 +12,9 @@ phases:
     commands:
       # This was started. Just replace REPLACEME_REPO_URI with your ECR Repo URI
       - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/mxnet-poc
-      
+
+      - echo get parameter store
+      - echo $POC_KEYS      
       - echo container credentials relative uri
       - echo $AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
 
